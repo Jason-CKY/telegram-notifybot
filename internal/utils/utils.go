@@ -12,8 +12,11 @@ func FloatPtr(num float64) *float64 {
 }
 
 func IsUsernameAllowed(username string) bool {
+	if len(WhitelistedUsernames) == 0 {
+		return true
+	}
 	for _, allowed_username := range WhitelistedUsernames {
-		if strings.Compare(username, allowed_username) == 0 {
+		if strings.EqualFold(username, allowed_username) {
 			return true
 		}
 	}
@@ -22,8 +25,8 @@ func IsUsernameAllowed(username string) bool {
 
 func LookupEnvStringArray(key string) []string {
 	envVariable, exists := os.LookupEnv(key)
-	if !exists {
-		panic(fmt.Errorf("%v environment variable not set", key))
+	if !exists || envVariable == "" {
+		return []string{}
 	}
 	return strings.Split(envVariable, ",")
 }
