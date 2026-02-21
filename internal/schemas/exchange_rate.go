@@ -5,94 +5,25 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
-	"strings"
+	"sort"
 	"time"
 )
 
-const MASExchangeRatesResourceID = "10eafb90-11a2-4fbd-b7a7-ac15a42d60b6"
-const MASExchangeRatesAPIURL = "https://eservices.mas.gov.sg/api/action/datastore/search.json"
+const FrankfurterAPIURL = "https://api.frankfurter.dev/v1"
 
-type ExchangeRateRecord struct {
-	EndOfMonth string `json:"end_of_month"`
-	USDSGD     string `json:"usd_sgd"`
-	EURSGD     string `json:"eur_sgd"`
-	GBPSGD     string `json:"gbp_sgd"`
-	JPYSGD100  string `json:"jpy_sgd_100"`
-	MYRSGD     string `json:"myr_sgd"`
-	HKDSGD     string `json:"hkd_sgd"`
-	AUDSGD     string `json:"aud_sgd"`
-	KRWSGD100  string `json:"krw_sgd_100"`
-	TWDSGD     string `json:"twd_sgd"`
-	IDRSGD1000 string `json:"idr_sgd_1000"`
-	THBSGD     string `json:"thb_sgd"`
-	CNYSGD     string `json:"cny_sgd"`
-	INRSGD     string `json:"inr_sgd"`
-	PHPSGD     string `json:"php_sgd"`
+type FrankfurterLatestResponse struct {
+	Amount float64            `json:"amount"`
+	Base   string             `json:"base"`
+	Date   string             `json:"date"`
+	Rates  map[string]float64 `json:"rates"`
 }
 
-func (r ExchangeRateRecord) GetRate(currency string) (float64, error) {
-	var rateStr string
-	var divisor float64 = 1.0
-
-	switch strings.ToUpper(currency) {
-	case "USD":
-		rateStr = r.USDSGD
-	case "EUR":
-		rateStr = r.EURSGD
-	case "GBP":
-		rateStr = r.GBPSGD
-	case "JPY":
-		rateStr = r.JPYSGD100
-		divisor = 100.0
-	case "MYR":
-		rateStr = r.MYRSGD
-	case "HKD":
-		rateStr = r.HKDSGD
-	case "AUD":
-		rateStr = r.AUDSGD
-	case "KRW":
-		rateStr = r.KRWSGD100
-		divisor = 100.0
-	case "TWD":
-		rateStr = r.TWDSGD
-	case "IDR":
-		rateStr = r.IDRSGD1000
-		divisor = 1000.0
-	case "THB":
-		rateStr = r.THBSGD
-	case "CNY":
-		rateStr = r.CNYSGD
-	case "INR":
-		rateStr = r.INRSGD
-	case "PHP":
-		rateStr = r.PHPSGD
-	default:
-		return 0, fmt.Errorf("unsupported currency: %s", currency)
-	}
-
-	if rateStr == "" || rateStr == "-" {
-		return 0, fmt.Errorf("rate not available for currency: %s", currency)
-	}
-
-	rate, err := strconv.ParseFloat(rateStr, 64)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing rate for %s: %v", currency, err)
-	}
-
-	return rate / divisor, nil
-}
-
-func (r ExchangeRateRecord) GetMonth() (time.Time, error) {
-	return time.Parse("2006-01", r.EndOfMonth)
-}
-
-type MASExchangeRatesResponse struct {
-	Success bool `json:"success"`
-	Result  struct {
-		Total   int                  `json:"total"`
-		Records []ExchangeRateRecord `json:"records"`
-	} `json:"result"`
+type FrankfurterHistoricalResponse struct {
+	Amount    float64                       `json:"amount"`
+	Base      string                        `json:"base"`
+	StartDate string                        `json:"start_date"`
+	EndDate   string                        `json:"end_date"`
+	Rates     map[string]map[string]float64 `json:"rates"`
 }
 
 type HistoricalRate struct {
@@ -100,9 +31,8 @@ type HistoricalRate struct {
 	Rate float64
 }
 
-func FetchLatestExchangeRate(currency string) (float64, *ExchangeRateRecord, error) {
-	endpoint := fmt.Sprintf("%s?resource_id=%s&limit=1&sort=end_of_month desc",
-		MASExchangeRatesAPIURL, MASExchangeRatesResourceID)
+func FetchLatestExchangeRate(currency string) (float64, *FrankfurterLatestResponse, error) {
+	endpoint := fmt.Sprintf("%s/latest?from=SGD&to=%s", FrankfurterAPIURL, currency)
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -110,7 +40,7 @@ func FetchLatestExchangeRate(currency string) (float64, *ExchangeRateRecord, err
 	}
 	req.Header.Set("User-Agent", "Telegram-NotifyBot/1.0")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	res, err := client.Do(req)
 	if err != nil {
 		return 0, nil, err
@@ -119,30 +49,38 @@ func FetchLatestExchangeRate(currency string) (float64, *ExchangeRateRecord, err
 
 	body, _ := io.ReadAll(res.Body)
 	if res.StatusCode != 200 {
-		return 0, nil, fmt.Errorf("MAS API error: status %d, body: %s", res.StatusCode, string(body))
+		return 0, nil, fmt.Errorf("Frankfurter API error: status %d, body: %s", res.StatusCode, string(body))
 	}
 
-	var response MASExchangeRatesResponse
+	var response FrankfurterLatestResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return 0, nil, err
 	}
 
-	if !response.Success || len(response.Result.Records) == 0 {
-		return 0, nil, fmt.Errorf("no exchange rate data available")
+	rate, ok := response.Rates[currency]
+	if !ok {
+		return 0, nil, fmt.Errorf("rate not available for currency: %s", currency)
 	}
 
-	record := response.Result.Records[0]
-	rate, err := record.GetRate(currency)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	return rate, &record, nil
+	return 1.0 / rate, &response, nil
 }
 
-func FetchHistoricalExchangeRates(currency string, months int) ([]HistoricalRate, error) {
-	endpoint := fmt.Sprintf("%s?resource_id=%s&limit=%d&sort=end_of_month desc",
-		MASExchangeRatesAPIURL, MASExchangeRatesResourceID, months)
+func FetchHistoricalExchangeRates(currency string, days int) ([]HistoricalRate, error) {
+	if days <= 0 {
+		days = 365
+	}
+	if days > 3650 {
+		days = 3650
+	}
+
+	endDate := time.Now()
+	startDate := endDate.AddDate(0, 0, -days)
+
+	endpoint := fmt.Sprintf("%s/%s..%s?from=SGD&to=%s",
+		FrankfurterAPIURL,
+		startDate.Format("2006-01-02"),
+		endDate.Format("2006-01-02"),
+		currency)
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -150,7 +88,7 @@ func FetchHistoricalExchangeRates(currency string, months int) ([]HistoricalRate
 	}
 	req.Header.Set("User-Agent", "Telegram-NotifyBot/1.0")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -159,37 +97,33 @@ func FetchHistoricalExchangeRates(currency string, months int) ([]HistoricalRate
 
 	body, _ := io.ReadAll(res.Body)
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("MAS API error: status %d, body: %s", res.StatusCode, string(body))
+		return nil, fmt.Errorf("Frankfurter API error: status %d, body: %s", res.StatusCode, string(body))
 	}
 
-	var response MASExchangeRatesResponse
+	var response FrankfurterHistoricalResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, err
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("MAS API returned success=false")
-	}
-
-	rates := make([]HistoricalRate, 0, len(response.Result.Records))
-	for _, record := range response.Result.Records {
-		rate, err := record.GetRate(currency)
-		if err != nil {
+	rates := make([]HistoricalRate, 0, len(response.Rates))
+	for dateStr, rateMap := range response.Rates {
+		rate, ok := rateMap[currency]
+		if !ok {
 			continue
 		}
-		date, err := record.GetMonth()
+		date, err := time.Parse("2006-01-02", dateStr)
 		if err != nil {
 			continue
 		}
 		rates = append(rates, HistoricalRate{
 			Date: date,
-			Rate: rate,
+			Rate: 1.0 / rate,
 		})
 	}
 
-	for i, j := 0, len(rates)-1; i < j; i, j = i+1, j-1 {
-		rates[i], rates[j] = rates[j], rates[i]
-	}
+	sort.Slice(rates, func(i, j int) bool {
+		return rates[i].Date.Before(rates[j].Date)
+	})
 
 	return rates, nil
 }

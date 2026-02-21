@@ -16,10 +16,26 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 	values := make([]float64, len(rates))
 	dates := make([]string, len(rates))
 
+	minVal := rates[0].Rate
+	maxVal := rates[0].Rate
+
 	for i, r := range rates {
 		values[i] = r.Rate
 		dates[i] = r.Date.Format("Jan 06")
+		if r.Rate < minVal {
+			minVal = r.Rate
+		}
+		if r.Rate > maxVal {
+			maxVal = r.Rate
+		}
 	}
+
+	padding := (maxVal - minVal) * 0.1
+	if padding == 0 {
+		padding = maxVal * 0.05
+	}
+	minWithPadding := minVal - padding
+	maxWithPadding := maxVal + padding
 
 	chartOption := charts.ChartOption{
 		Width:  1000,
@@ -44,6 +60,12 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 			"Exchange Rate",
 		}, charts.PositionRight),
 		XAxis: charts.NewXAxisOption(dates),
+		YAxisOptions: []charts.YAxisOption{
+			{
+				Min: &minWithPadding,
+				Max: &maxWithPadding,
+			},
+		},
 		ValueFormatter: func(f float64) string {
 			return fmt.Sprintf("%.4f", f)
 		},
@@ -62,18 +84,18 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 	return &buf, nil
 }
 
-func FormatCurrentRateMessage(currency string, rate float64, record *schemas.ExchangeRateRecord) string {
+func FormatCurrentRateMessage(currency string, rate float64, response *schemas.FrankfurterLatestResponse) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("💱 *%s/SGD Exchange Rate*\n\n", currency))
-	sb.WriteString(fmt.Sprintf("Current Rate: *%.4f SGD*\n\n", rate))
+	sb.WriteString(fmt.Sprintf("💱 %s/SGD Exchange Rate\n\n", currency))
+	sb.WriteString(fmt.Sprintf("Current Rate: %.4f SGD\n\n", rate))
 
-	if record != nil {
-		sb.WriteString(fmt.Sprintf("Data as of: %s\n", record.EndOfMonth))
+	if response != nil {
+		sb.WriteString(fmt.Sprintf("Data as of: %s\n", response.Date))
 	}
 
-	sb.WriteString("\n_Use /fx_chart ")
+	sb.WriteString("\nUse /fx_chart ")
 	sb.WriteString(currency)
-	sb.WriteString(" for historical chart_")
+	sb.WriteString(" for historical chart")
 
 	return sb.String()
 }
@@ -84,10 +106,10 @@ func FormatSubscriptionListMessage(subscriptions []schemas.CurrencySubscription)
 	}
 
 	var sb strings.Builder
-	sb.WriteString("📋 *Your Currency Subscriptions*\n\n")
+	sb.WriteString("📋 Your Currency Subscriptions\n\n")
 
 	for _, sub := range subscriptions {
-		sb.WriteString(fmt.Sprintf("💱 *%s/SGD*\n", sub.Currency))
+		sb.WriteString(fmt.Sprintf("💱 %s/SGD\n", sub.Currency))
 		if sub.ThresholdAbove != nil {
 			sb.WriteString(fmt.Sprintf("  • Alert above: %.4f SGD\n", *sub.ThresholdAbove))
 		}
