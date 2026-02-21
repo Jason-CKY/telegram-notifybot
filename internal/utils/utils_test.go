@@ -4,7 +4,65 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestIsUsernameAllowed_EmptyWhitelist(t *testing.T) {
+	original := WhitelistedUsernames
+	WhitelistedUsernames = []string{}
+	defer func() { WhitelistedUsernames = original }()
+
+	tests := []struct {
+		username string
+		expected bool
+	}{
+		{"anyuser", true},
+		{"", true},
+		{"random", true},
+	}
+
+	for _, tt := range tests {
+		result := IsUsernameAllowed(tt.username)
+		assert.Equal(t, tt.expected, result, "IsUsernameAllowed(%q) = %v, want %v", tt.username, result, tt.expected)
+	}
+}
+
+func TestIsUsernameAllowed_WithWhitelist(t *testing.T) {
+	original := WhitelistedUsernames
+	WhitelistedUsernames = []string{"user1", "user2", "user3"}
+	defer func() { WhitelistedUsernames = original }()
+
+	tests := []struct {
+		username string
+		expected bool
+	}{
+		{"user1", true},
+		{"user2", true},
+		{"user3", true},
+		{"USER1", true},
+		{"User2", true},
+		{"user4", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		result := IsUsernameAllowed(tt.username)
+		assert.Equal(t, tt.expected, result, "IsUsernameAllowed(%q) = %v, want %v", tt.username, result, tt.expected)
+	}
+}
+
+func TestLookupEnvStringArray_NotSet(t *testing.T) {
+	t.Setenv("TEST_NONEXISTENT_VAR", "")
+	result := LookupEnvStringArray("TEST_NONEXISTENT_VAR")
+	assert.Empty(t, result)
+}
+
+func TestLookupEnvStringArray_Set(t *testing.T) {
+	t.Setenv("TEST_ARRAY_VAR", "a,b,c")
+	result := LookupEnvStringArray("TEST_ARRAY_VAR")
+	require.Len(t, result, 3)
+	assert.Equal(t, []string{"a", "b", "c"}, result)
+}
 
 func TestIsCurrencySupported(t *testing.T) {
 	tests := []struct {
