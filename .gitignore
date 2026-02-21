@@ -1,0 +1,10 @@
+.vscode
+.env
+
+tmp
+
+*.tar
+ignore
+*.json
+build/
+
