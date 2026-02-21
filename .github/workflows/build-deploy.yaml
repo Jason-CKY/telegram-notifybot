@@ -3,50 +3,63 @@ name: build-deploy
 on:
   push:
     branches:
-      - main # Trigger on pushes to the main branch
+      - main
     tags:
-      - 'v*.*.*' # Keep existing tag trigger
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set image tag
-        id: image_tag
-        env:
-          # Pass the full SHA as an environment variable to the step's run context
-          FULL_COMMIT_SHA: ${{ github.sha }} 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/telegram-notifybot
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha,prefix=
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          target: production
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set image as public
+        if: github.event_name != 'pull_request'
         run: |
-          IS_TAG_PUSH="false"
-          if [[ "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
-            echo "IS_TAG_PUSH=true" >> $GITHUB_OUTPUT
-            # For tag pushes, use the tag name directly
-            echo "GIT_TAG_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "IS_TAG_PUSH=false" >> $GITHUB_OUTPUT
-            # For branch pushes (every commit), use the short SHA
-            # Use shell command 'cut' to get the first 7 characters
-            SHORT_SHA=$(echo "$FULL_COMMIT_SHA" | cut -c1-7)
-            echo "GIT_TAG_NAME=$SHORT_SHA" >> $GITHUB_OUTPUT
-          fi
-
-
-      - name: Build and push the image
-        run: |
-          docker login --username Jason-CKY --password ${{ secrets.GH_PAT }} ghcr.io
-          
-          # Build and push the image with the specific tag (commit SHA or release tag)
-          docker build -f ./build/Dockerfile --tag ghcr.io/jason-cky/telegram-ssbbot:${{ steps.image_tag.outputs.GIT_TAG_NAME }} --target production .
-          docker push ghcr.io/jason-cky/telegram-ssbbot:${{ steps.image_tag.outputs.GIT_TAG_NAME }}
-
-          # Conditionally push the 'latest' tag only if it's a tag push
-          if [[ "${{ steps.image_tag.outputs.IS_TAG_PUSH }}" == "true" ]]; then
-            echo "Pushing 'latest' tag because it's a release tag push."
-            docker tag ghcr.io/jason-cky/telegram-ssbbot:${{ steps.image_tag.outputs.GIT_TAG_NAME }} ghcr.io/jason-cky/telegram-ssbbot:latest
-            docker push ghcr.io/jason-cky/telegram-ssbbot:latest
-          else
-            echo "Skipping 'latest' tag push as it's a regular commit to a branch."
-          fi
+          # Make the package public by updating its visibility
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/telegram-notifybot/visibility" \
+            -d '{"visibility":"public"}' \
+            || echo "Package may not exist yet or is owned by user, skipping visibility change"
