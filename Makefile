@@ -20,3 +20,7 @@ stop:		## bring down all hosted services
 .PHONY: destroy
 destroy:		## Bring down all hosted services with their volumes
 	docker-compose down -v
+
+.PHONY: test
+test:		## Run all tests
+	go test ./...

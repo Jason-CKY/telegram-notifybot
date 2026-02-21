@@ -22,7 +22,6 @@ func HandleCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	switch update.Message.Command() {
 	case "help":
 		msg.Text = utils.HELP_MESSAGE
-		msg.ParseMode = "Markdown"
 	case "start":
 		_, _, err := schemas.InsertChatSettingsIfNotPresent(update.Message.Chat.ID)
 		if err != nil {

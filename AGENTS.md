@@ -404,5 +404,6 @@ func (cs *CurrencySubscription) UnmarshalJSON(data []byte) error {
 - Threshold notifications are one-time (auto-remove after triggered)
 - Interval notifications persist until manually removed
 - FX scheduler runs every hour
-- MAS API provides monthly (end-of-month) exchange rates
-- JPY, KRW are quoted per 100 units; IDR per 1000 units - code handles division automatically
+- Frankfurter API provides daily exchange rates (replaced MAS API)
+- JPY, KRW are quoted per 100 units; code handles division automatically
+- **Always update HELP_MESSAGE in `internal/utils/common.go` and test files when changing command behavior or adding new commands**

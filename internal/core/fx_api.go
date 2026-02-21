@@ -4,7 +4,7 @@ import (
 	"github.com/Jason-CKY/telegram-notifybot/internal/schemas"
 )
 
-func GetCurrentRate(currency string) (float64, *schemas.ExchangeRateRecord, error) {
+func GetCurrentRate(currency string) (float64, *schemas.FrankfurterLatestResponse, error) {
 	return schemas.FetchLatestExchangeRate(currency)
 }
 
@@ -12,8 +12,9 @@ func GetHistoricalRates(currency string, months int) ([]schemas.HistoricalRate, 
 	if months <= 0 {
 		months = 12
 	}
-	if months > 60 {
-		months = 60
+	if months > 120 {
+		months = 120
 	}
-	return schemas.FetchHistoricalExchangeRates(currency, months)
+	days := months * 30
+	return schemas.FetchHistoricalExchangeRates(currency, days)
 }

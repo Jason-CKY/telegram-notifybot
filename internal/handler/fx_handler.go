@@ -31,7 +31,7 @@ func HandleFXCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 		return
 	}
 
-	rate, record, err := core.GetCurrentRate(currency)
+	rate, response, err := core.GetCurrentRate(currency)
 	if err != nil {
 		log.Error(err)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID,
@@ -41,8 +41,7 @@ func HandleFXCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	}
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-		core.FormatCurrentRateMessage(currency, rate, record))
-	msg.ParseMode = "Markdown"
+		core.FormatCurrentRateMessage(currency, rate, response))
 	bot.Send(msg)
 }
 
@@ -103,10 +102,10 @@ func HandleFXSubscribeCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 
 	if args == "" {
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-			"Usage: /fx_subscribe <currency> --above <rate> OR --below <rate>\n\n"+
+			"Usage: /fx_subscribe <currency> -above <rate> OR -below <rate>\n\n"+
 				"Examples:\n"+
-				"/fx_subscribe USD --above 1.40\n"+
-				"/fx_subscribe EUR --below 1.45")
+				"/fx_subscribe USD -above 1.40\n"+
+				"/fx_subscribe EUR -below 1.45")
 		bot.Send(msg)
 		return
 	}
@@ -116,12 +115,12 @@ func HandleFXSubscribeCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 
 	parts := strings.Fields(args)
 	for i, part := range parts {
-		if strings.ToUpper(part) == "--ABOVE" && i+1 < len(parts) {
+		if strings.ToUpper(part) == "-ABOVE" && i+1 < len(parts) {
 			currency = strings.ToUpper(parts[0])
 			if val, err := strconv.ParseFloat(parts[i+1], 64); err == nil {
 				thresholdAbove = &val
 			}
-		} else if strings.ToUpper(part) == "--BELOW" && i+1 < len(parts) {
+		} else if strings.ToUpper(part) == "-BELOW" && i+1 < len(parts) {
 			currency = strings.ToUpper(parts[0])
 			if val, err := strconv.ParseFloat(parts[i+1], 64); err == nil {
 				thresholdBelow = &val
@@ -135,7 +134,7 @@ func HandleFXSubscribeCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 
 	if currency == "" {
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-			"Please specify a currency.\nExample: /fx_subscribe USD --above 1.40")
+			"Please specify a currency.\nExample: /fx_subscribe USD -above 1.40")
 		bot.Send(msg)
 		return
 	}
@@ -150,7 +149,7 @@ func HandleFXSubscribeCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 
 	if thresholdAbove == nil && thresholdBelow == nil {
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-			"Please specify --above or --below with a rate.\nExample: /fx_subscribe USD --above 1.40")
+			"Please specify -above or -below with a rate.\nExample: /fx_subscribe USD -above 1.40")
 		bot.Send(msg)
 		return
 	}
@@ -242,7 +241,6 @@ func HandleFXListCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID,
 		core.FormatSubscriptionListMessage(subscriptions))
-	msg.ParseMode = "Markdown"
 	bot.Send(msg)
 }
 
