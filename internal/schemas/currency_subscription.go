@@ -300,9 +300,9 @@ func (sub *CurrencySubscription) ShouldNotifyForInterval(currentRate float64) bo
 func (sub *CurrencySubscription) GetNotificationMessage(currentRate float64, rates []HistoricalRate) string {
 	var thresholdMsg string
 	if sub.ThresholdAbove != nil && currentRate >= *sub.ThresholdAbove {
-		thresholdMsg = fmt.Sprintf("📊 Threshold: Above %.4f ✓ triggered\n", *sub.ThresholdAbove)
+		thresholdMsg = fmt.Sprintf("📊 Threshold: Above %.4f SGD ✓ triggered\n", *sub.ThresholdAbove)
 	} else if sub.ThresholdBelow != nil && currentRate <= *sub.ThresholdBelow {
-		thresholdMsg = fmt.Sprintf("📊 Threshold: Below %.4f ✓ triggered\n", *sub.ThresholdBelow)
+		thresholdMsg = fmt.Sprintf("📊 Threshold: Below %.4f SGD ✓ triggered\n", *sub.ThresholdBelow)
 	}
 
 	var changeMsg string
@@ -330,10 +330,11 @@ func (sub *CurrencySubscription) GetNotificationMessage(currentRate float64, rat
 
 	return fmt.Sprintf(
 		"💱 *%s/SGD Rate Alert*\n\n"+
-			"Current Rate: %.4f SGD\n"+
+			"1 %s → %.4f SGD\n"+
+			"1 SGD → %.4f %s\n\n"+
 			"%s"+
 			"%s"+
 			"📈 12-Month Range: %.4f - %.4f\n",
-		sub.Currency, currentRate, changeMsg, thresholdMsg, minRate, maxRate,
+		sub.Currency, sub.Currency, currentRate, 1/currentRate, sub.Currency, changeMsg, thresholdMsg, minRate, maxRate,
 	)
 }

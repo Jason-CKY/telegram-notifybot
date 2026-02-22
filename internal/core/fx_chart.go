@@ -87,7 +87,8 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 func FormatCurrentRateMessage(currency string, rate float64, response *schemas.FrankfurterLatestResponse) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("💱 %s/SGD Exchange Rate\n\n", currency))
-	sb.WriteString(fmt.Sprintf("Current Rate: %.4f SGD\n\n", rate))
+	sb.WriteString(fmt.Sprintf("1 %s → %.4f SGD\n", currency, rate))
+	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n\n", 1/rate, currency))
 
 	if response != nil {
 		sb.WriteString(fmt.Sprintf("Data as of: %s\n", response.Date))
@@ -111,13 +112,13 @@ func FormatSubscriptionListMessage(subscriptions []schemas.CurrencySubscription)
 	for _, sub := range subscriptions {
 		sb.WriteString(fmt.Sprintf("💱 %s/SGD\n", sub.Currency))
 		if sub.ThresholdAbove != nil {
-			sb.WriteString(fmt.Sprintf("  • Alert above: %.4f SGD\n", *sub.ThresholdAbove))
+			sb.WriteString(fmt.Sprintf("  • Alert above: %.4f SGD (1 SGD → %.4f %s)\n", *sub.ThresholdAbove, 1.0/(*sub.ThresholdAbove), sub.Currency))
 		}
 		if sub.ThresholdBelow != nil {
-			sb.WriteString(fmt.Sprintf("  • Alert below: %.4f SGD\n", *sub.ThresholdBelow))
+			sb.WriteString(fmt.Sprintf("  • Alert below: %.4f SGD (1 SGD → %.4f %s)\n", *sub.ThresholdBelow, 1.0/(*sub.ThresholdBelow), sub.Currency))
 		}
 		if sub.Interval != nil {
-			sb.WriteString(fmt.Sprintf("  • Interval: %.4f SGD\n", *sub.Interval))
+			sb.WriteString(fmt.Sprintf("  • Interval: %.4f SGD (1 SGD → %.4f %s)\n", *sub.Interval, 1.0/(*sub.Interval), sub.Currency))
 		}
 		sb.WriteString("\n")
 	}
