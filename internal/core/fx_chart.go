@@ -8,7 +8,7 @@ import (
 	"github.com/vicanso/go-charts/v2"
 )
 
-func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) (*[]byte, error) {
+func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, inverse bool) (*[]byte, error) {
 	if len(rates) == 0 {
 		return nil, fmt.Errorf("no historical rates available")
 	}
@@ -16,17 +16,23 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 	values := make([]float64, len(rates))
 	dates := make([]string, len(rates))
 
-	minVal := rates[0].Rate
-	maxVal := rates[0].Rate
-
 	for i, r := range rates {
-		values[i] = r.Rate
-		dates[i] = r.Date.Format("Jan 06")
-		if r.Rate < minVal {
-			minVal = r.Rate
+		if inverse {
+			values[i] = r.Rate
+		} else {
+			values[i] = 1.0 / r.Rate
 		}
-		if r.Rate > maxVal {
-			maxVal = r.Rate
+		dates[i] = r.Date.Format("Jan 06")
+	}
+
+	minVal := values[0]
+	maxVal := values[0]
+	for _, v := range values {
+		if v < minVal {
+			minVal = v
+		}
+		if v > maxVal {
+			maxVal = v
 		}
 	}
 
@@ -36,6 +42,11 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 	}
 	minWithPadding := minVal - padding
 	maxWithPadding := maxVal + padding
+
+	title := fmt.Sprintf("SGD/%s Exchange Rate History", currency)
+	if inverse {
+		title = fmt.Sprintf("%s/SGD Exchange Rate History (Inverse)", currency)
+	}
 
 	chartOption := charts.ChartOption{
 		Width:  1000,
@@ -48,7 +59,7 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 			},
 		},
 		Title: charts.TitleOption{
-			Text: fmt.Sprintf("%s/SGD Exchange Rate History", currency),
+			Text: title,
 		},
 		Padding: charts.Box{
 			Top:    20,
@@ -87,8 +98,8 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string) 
 func FormatCurrentRateMessage(currency string, rate float64, response *schemas.FrankfurterLatestResponse) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("💱 %s/SGD Exchange Rate\n\n", currency))
-	sb.WriteString(fmt.Sprintf("1 %s → %.4f SGD\n", currency, rate))
-	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n\n", 1/rate, currency))
+	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n", 1/rate, currency))
+	sb.WriteString(fmt.Sprintf("1 %s → %.4f SGD\n\n", currency, rate))
 
 	if response != nil {
 		sb.WriteString(fmt.Sprintf("Data as of: %s\n", response.Date))
