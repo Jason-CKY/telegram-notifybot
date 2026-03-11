@@ -48,11 +48,13 @@ func checkAndNotify(bot *tgbotapi.BotAPI, timezone *time.Location) {
 			}
 			currencyRates[sub.Currency] = rate
 
-			history, err := GetHistoricalRates(sub.Currency, 12)
-			if err != nil {
-				log.Errorf("Error fetching history for %s: %v", sub.Currency, err)
-			} else {
-				currencyHistories[sub.Currency] = history
+			if sub.Currency != "TWD" && sub.Currency != "VND" {
+				history, err := GetHistoricalRates(sub.Currency, 12)
+				if err != nil {
+					log.Errorf("Error fetching history for %s: %v", sub.Currency, err)
+				} else {
+					currencyHistories[sub.Currency] = history
+				}
 			}
 		}
 	}
@@ -90,7 +92,7 @@ func checkAndNotify(bot *tgbotapi.BotAPI, timezone *time.Location) {
 			defer wg.Done()
 
 			history := currencyHistories[s.Currency]
-			chartBuf, err := GenerateExchangeRateChart(history, s.Currency)
+			chartBuf, err := GenerateExchangeRateChart(history, s.Currency, false)
 			if err != nil {
 				log.Errorf("Error generating chart for %s: %v", s.Currency, err)
 			}

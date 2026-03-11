@@ -18,7 +18,7 @@ func TestGenerateExchangeRateChart_Success(t *testing.T) {
 		{Date: time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC), Rate: 1.3100},
 	}
 
-	chartData, err := GenerateExchangeRateChart(rates, "USD")
+	chartData, err := GenerateExchangeRateChart(rates, "USD", false)
 	require.NoError(t, err)
 	require.NotNil(t, chartData)
 	assert.NotEmpty(t, *chartData)
@@ -26,7 +26,7 @@ func TestGenerateExchangeRateChart_Success(t *testing.T) {
 }
 
 func TestGenerateExchangeRateChart_EmptyRates(t *testing.T) {
-	_, err := GenerateExchangeRateChart([]schemas.HistoricalRate{}, "USD")
+	_, err := GenerateExchangeRateChart([]schemas.HistoricalRate{}, "USD", false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no historical rates")
 }
@@ -36,7 +36,7 @@ func TestGenerateExchangeRateChart_SingleRate(t *testing.T) {
 		{Date: time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC), Rate: 1.3500},
 	}
 
-	chartData, err := GenerateExchangeRateChart(rates, "USD")
+	chartData, err := GenerateExchangeRateChart(rates, "USD", false)
 	require.NoError(t, err)
 	require.NotNil(t, chartData)
 	assert.NotEmpty(t, *chartData)
@@ -49,7 +49,7 @@ func TestGenerateExchangeRateChart_YAxisScaling(t *testing.T) {
 		{Date: time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC), Rate: 1.3499},
 	}
 
-	chartData, err := GenerateExchangeRateChart(rates, "USD")
+	chartData, err := GenerateExchangeRateChart(rates, "USD", false)
 	require.NoError(t, err)
 	require.NotNil(t, chartData)
 	assert.NotEmpty(t, *chartData)

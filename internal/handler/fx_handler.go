@@ -49,7 +49,7 @@ func HandleFXChartCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	args := strings.Fields(update.Message.CommandArguments())
 	if len(args) == 0 {
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-			"Usage: /fx_chart <currency> [months]\nExample: /fx_chart USD 6")
+			"Usage: /fx_chart <currency> [months] [-inverse]\nExample: /fx_chart USD 6\nExample: /fx_chart USD 6 -inverse")
 		bot.Send(msg)
 		return
 	}
@@ -63,9 +63,20 @@ func HandleFXChartCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 		return
 	}
 
+	if !utils.IsHistoricalSupported(currency) {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+			fmt.Sprintf("Historical data not available for %s.\n\nNo free API resources for historical currency data.", currency))
+		bot.Send(msg)
+		return
+	}
+
 	months := 12
-	if len(args) > 1 {
-		if m, err := strconv.Atoi(args[1]); err == nil && m > 0 {
+	inverse := false
+	for _, arg := range args[1:] {
+		argUpper := strings.ToUpper(arg)
+		if argUpper == "-INVERSE" || argUpper == "-I" {
+			inverse = true
+		} else if m, err := strconv.Atoi(arg); err == nil && m > 0 {
 			months = m
 		}
 	}
@@ -79,7 +90,7 @@ func HandleFXChartCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 		return
 	}
 
-	chartBuf, err := core.GenerateExchangeRateChart(rates, currency)
+	chartBuf, err := core.GenerateExchangeRateChart(rates, currency, inverse)
 	if err != nil {
 		log.Error(err)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID,
@@ -93,7 +104,11 @@ func HandleFXChartCommand(update *tgbotapi.Update, bot *tgbotapi.BotAPI) {
 		Bytes: *chartBuf,
 	}
 	photoConfig := tgbotapi.NewPhoto(update.Message.Chat.ID, photoFileBytes)
-	photoConfig.Caption = fmt.Sprintf("📊 %s/SGD Exchange Rate (%d months)", currency, months)
+	if inverse {
+		photoConfig.Caption = fmt.Sprintf("📊 %s/SGD Exchange Rate (Inverse) (%d months)", currency, months)
+	} else {
+		photoConfig.Caption = fmt.Sprintf("📊 SGD/%s Exchange Rate (%d months)", currency, months)
+	}
 	bot.Send(photoConfig)
 }
 

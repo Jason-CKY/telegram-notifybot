@@ -316,6 +316,7 @@ func (sub *CurrencySubscription) GetNotificationMessage(currentRate float64, rat
 	}
 
 	var minRate, maxRate float64
+	var rangeMsg string
 	if len(rates) > 0 {
 		minRate, maxRate = rates[0].Rate, rates[0].Rate
 		for _, r := range rates {
@@ -326,15 +327,18 @@ func (sub *CurrencySubscription) GetNotificationMessage(currentRate float64, rat
 				maxRate = r.Rate
 			}
 		}
+		rangeMsg = fmt.Sprintf("📈 12-Month Range: %.4f - %.4f\n", minRate, maxRate)
+	} else {
+		rangeMsg = "📈 12-Month Range: N/A (historical data unavailable)\n"
 	}
 
 	return fmt.Sprintf(
 		"💱 *%s/SGD Rate Alert*\n\n"+
-			"1 %s → %.4f SGD\n"+
-			"1 SGD → %.4f %s\n\n"+
+			"1 SGD → %.4f %s\n"+
+			"1 %s → %.4f SGD\n\n"+
 			"%s"+
 			"%s"+
-			"📈 12-Month Range: %.4f - %.4f\n",
-		sub.Currency, sub.Currency, currentRate, 1/currentRate, sub.Currency, changeMsg, thresholdMsg, minRate, maxRate,
+			"%s",
+		sub.Currency, 1/currentRate, sub.Currency, sub.Currency, currentRate, changeMsg, thresholdMsg, rangeMsg,
 	)
 }

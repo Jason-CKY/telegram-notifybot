@@ -98,7 +98,7 @@ func TestIsCurrencySupported(t *testing.T) {
 }
 
 func TestSupportedCurrencies_ContainsAll(t *testing.T) {
-	expected := []string{"USD", "EUR", "GBP", "JPY", "MYR", "HKD", "AUD", "KRW", "TWD", "IDR", "THB", "CNY", "INR", "PHP"}
+	expected := []string{"USD", "EUR", "GBP", "JPY", "MYR", "HKD", "AUD", "KRW", "TWD", "VND", "IDR", "THB", "CNY", "INR", "PHP"}
 	assert.ElementsMatch(t, SupportedCurrencies, expected)
 }
 
