@@ -48,13 +48,11 @@ func checkAndNotify(bot *tgbotapi.BotAPI, timezone *time.Location) {
 			}
 			currencyRates[sub.Currency] = rate
 
-			if sub.Currency != "TWD" && sub.Currency != "VND" {
-				history, err := GetHistoricalRates(sub.Currency, 12)
-				if err != nil {
-					log.Errorf("Error fetching history for %s: %v", sub.Currency, err)
-				} else {
-					currencyHistories[sub.Currency] = history
-				}
+			history, err := GetHistoricalRates(sub.Currency, 12)
+			if err != nil {
+				log.Errorf("Error fetching history for %s: %v", sub.Currency, err)
+			} else {
+				currencyHistories[sub.Currency] = history
 			}
 		}
 	}

@@ -10,10 +10,49 @@ import (
 )
 
 const (
-	FrankfurterAPIURL        = "https://api.frankfurter.dev/v1"
-	ExchangeRateAPIURL       = "https://open.er-api.com/v6/latest"
-	CurrenciesWithoutHistory = "TWD,VND"
+	YahooFinanceURL = "https://query1.finance.yahoo.com/v8/finance/chart"
 )
+
+var (
+	yahooFinanceURL = YahooFinanceURL
+)
+
+func SetYahooFinanceURL(url string) {
+	yahooFinanceURL = url
+}
+
+func GetYahooFinanceURL() string {
+	return yahooFinanceURL
+}
+
+type YahooChartResponse struct {
+	Chart struct {
+		Result []*YahooChartResult `json:"result"`
+		Error  interface{}         `json:"error"`
+	} `json:"chart"`
+}
+
+type YahooChartResult struct {
+	Meta       YahooMeta `json:"meta"`
+	Timestamp  []int64   `json:"timestamp"`
+	Indicators struct {
+		Quote []YahooQuote `json:"quote"`
+	} `json:"indicators"`
+}
+
+type YahooMeta struct {
+	RegularMarketPrice float64 `json:"regularMarketPrice"`
+	Currency           string  `json:"currency"`
+}
+
+type YahooQuote struct {
+	Close []float64 `json:"close"`
+}
+
+type HistoricalRate struct {
+	Date time.Time
+	Rate float64
+}
 
 type FrankfurterLatestResponse struct {
 	Amount float64            `json:"amount"`
@@ -22,36 +61,12 @@ type FrankfurterLatestResponse struct {
 	Rates  map[string]float64 `json:"rates"`
 }
 
-type FrankfurterHistoricalResponse struct {
-	Amount    float64                       `json:"amount"`
-	Base      string                        `json:"base"`
-	StartDate string                        `json:"start_date"`
-	EndDate   string                        `json:"end_date"`
-	Rates     map[string]map[string]float64 `json:"rates"`
-}
-
-type HistoricalRate struct {
-	Date time.Time
-	Rate float64
-}
-
-type ExchangeRateAPIResponse struct {
-	Result             string             `json:"result"`
-	Provider           string             `json:"provider"`
-	BaseCode           string             `json:"base_code"`
-	TimeLastUpdateUnix int64              `json:"time_last_update_unix"`
-	Rates              map[string]float64 `json:"rates"`
-}
-
 func FetchLatestExchangeRate(currency string) (float64, *FrankfurterLatestResponse, error) {
-	if currency == "TWD" || currency == "VND" {
-		return fetchLatestFromExchangeRateAPI(currency)
-	}
-	return fetchLatestFromFrankfurter(currency)
+	return fetchLatestFromYahoo(currency)
 }
 
-func fetchLatestFromFrankfurter(currency string) (float64, *FrankfurterLatestResponse, error) {
-	endpoint := fmt.Sprintf("%s/latest?from=SGD&to=%s", FrankfurterAPIURL, currency)
+func fetchLatestFromYahoo(currency string) (float64, *FrankfurterLatestResponse, error) {
+	endpoint := fmt.Sprintf("%s/SGD%s=X", yahooFinanceURL, currency)
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -68,54 +83,24 @@ func fetchLatestFromFrankfurter(currency string) (float64, *FrankfurterLatestRes
 
 	body, _ := io.ReadAll(res.Body)
 	if res.StatusCode != 200 {
-		return 0, nil, fmt.Errorf("Frankfurter API error: status %d, body: %s", res.StatusCode, string(body))
+		return 0, nil, fmt.Errorf("Yahoo Finance API error: status %d, body: %s", res.StatusCode, string(body))
 	}
 
-	var response FrankfurterLatestResponse
+	var response YahooChartResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return 0, nil, err
 	}
 
-	rate, ok := response.Rates[currency]
-	if !ok {
-		return 0, nil, fmt.Errorf("rate not available for currency: %s", currency)
+	if len(response.Chart.Result) == 0 {
+		return 0, nil, fmt.Errorf("no data available for currency: %s", currency)
 	}
 
-	return 1.0 / rate, &response, nil
-}
+	result := response.Chart.Result[0]
+	rate := result.Meta.RegularMarketPrice
 
-func fetchLatestFromExchangeRateAPI(currency string) (float64, *FrankfurterLatestResponse, error) {
-	endpoint := fmt.Sprintf("%s/%s", ExchangeRateAPIURL, "SGD")
+	fmt.Printf("[DEBUG] /fx rate for %s: %f SGD/%s\n", currency, rate, currency)
 
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		return 0, nil, err
-	}
-	req.Header.Set("User-Agent", "Telegram-NotifyBot/1.0")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	res, err := client.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer res.Body.Close()
-
-	body, _ := io.ReadAll(res.Body)
-	if res.StatusCode != 200 {
-		return 0, nil, fmt.Errorf("ExchangeRate-API error: status %d, body: %s", res.StatusCode, string(body))
-	}
-
-	var response ExchangeRateAPIResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return 0, nil, err
-	}
-
-	if response.Result != "success" {
-		return 0, nil, fmt.Errorf("ExchangeRate-API error: %s", response.Result)
-	}
-
-	rate, ok := response.Rates[currency]
-	if !ok {
+	if rate == 0 {
 		return 0, nil, fmt.Errorf("rate not available for currency: %s", currency)
 	}
 
@@ -123,17 +108,13 @@ func fetchLatestFromExchangeRateAPI(currency string) (float64, *FrankfurterLates
 		Amount: 1.0,
 		Base:   "SGD",
 		Date:   time.Now().Format("2006-01-02"),
-		Rates:  map[string]float64{currency: 1.0 / rate},
+		Rates:  map[string]float64{currency: rate},
 	}
 
-	return 1.0 / rate, frankfurterResp, nil
+	return rate, frankfurterResp, nil
 }
 
 func FetchHistoricalExchangeRates(currency string, days int) ([]HistoricalRate, error) {
-	if currency == "TWD" || currency == "VND" {
-		return nil, fmt.Errorf("historical data not available for %s: no free API resources for historical currency data", currency)
-	}
-
 	if days <= 0 {
 		days = 365
 	}
@@ -141,14 +122,36 @@ func FetchHistoricalExchangeRates(currency string, days int) ([]HistoricalRate, 
 		days = 3650
 	}
 
-	endDate := time.Now()
-	startDate := endDate.AddDate(0, 0, -days)
+	if currency == "VND" || currency == "PHP" {
+		return fetchHistoricalWithUSDIntermediary(currency, days)
+	}
 
-	endpoint := fmt.Sprintf("%s/%s..%s?from=SGD&to=%s",
-		FrankfurterAPIURL,
-		startDate.Format("2006-01-02"),
-		endDate.Format("2006-01-02"),
-		currency)
+	return fetchHistoricalFromYahoo(currency, days)
+}
+
+func fetchHistoricalFromYahoo(currency string, days int) ([]HistoricalRate, error) {
+	return fetchHistoricalFromYahooWithPair("SGD", currency, days)
+}
+
+func fetchHistoricalFromYahooWithPair(base, quote string, days int) ([]HistoricalRate, error) {
+	var rangeParam string
+	if days <= 5 {
+		rangeParam = "5d"
+	} else if days <= 30 {
+		rangeParam = "1mo"
+	} else if days <= 90 {
+		rangeParam = "3mo"
+	} else if days <= 180 {
+		rangeParam = "6mo"
+	} else if days <= 365 {
+		rangeParam = "1y"
+	} else if days <= 730 {
+		rangeParam = "2y"
+	} else {
+		rangeParam = "5y"
+	}
+
+	endpoint := fmt.Sprintf("%s/%s%s=X?range=%s&interval=1d", yahooFinanceURL, base, quote, rangeParam)
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -165,27 +168,83 @@ func FetchHistoricalExchangeRates(currency string, days int) ([]HistoricalRate, 
 
 	body, _ := io.ReadAll(res.Body)
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("Frankfurter API error: status %d, body: %s", res.StatusCode, string(body))
+		return nil, fmt.Errorf("Yahoo Finance API error: status %d, body: %s", res.StatusCode, string(body))
 	}
 
-	var response FrankfurterHistoricalResponse
+	var response YahooChartResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, err
 	}
 
-	rates := make([]HistoricalRate, 0, len(response.Rates))
-	for dateStr, rateMap := range response.Rates {
-		rate, ok := rateMap[currency]
-		if !ok {
-			continue
-		}
-		date, err := time.Parse("2006-01-02", dateStr)
-		if err != nil {
+	if len(response.Chart.Result) == 0 {
+		return nil, fmt.Errorf("no historical data available for currency: %s/%s", base, quote)
+	}
+
+	result := response.Chart.Result[0]
+
+	if len(result.Indicators.Quote) == 0 || len(result.Indicators.Quote[0].Close) == 0 {
+		return nil, fmt.Errorf("no quote data available for currency: %s/%s", base, quote)
+	}
+
+	rates := make([]HistoricalRate, 0, len(result.Timestamp))
+	closes := result.Indicators.Quote[0].Close
+	for i, ts := range result.Timestamp {
+		if i >= len(closes) || closes[i] == 0 {
 			continue
 		}
 		rates = append(rates, HistoricalRate{
-			Date: date,
-			Rate: 1.0 / rate,
+			Date: time.Unix(ts, 0).UTC(),
+			Rate: closes[i],
+		})
+	}
+
+	sort.Slice(rates, func(i, j int) bool {
+		return rates[i].Date.Before(rates[j].Date)
+	})
+
+	if len(rates) > days {
+		rates = rates[len(rates)-days:]
+	}
+
+	return rates, nil
+}
+
+func fetchHistoricalWithUSDIntermediary(currency string, days int) ([]HistoricalRate, error) {
+	usdSGD, err := fetchHistoricalFromYahooWithPair("USD", "SGD", days)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch USD/SGD rates: %w", err)
+	}
+	fmt.Printf("[DEBUG] USD/SGD rates fetched: %d points\n", len(usdSGD))
+
+	currUSD, err := fetchHistoricalFromYahooWithPair(currency, "USD", days)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s/USD rates: %w", currency, err)
+	}
+	fmt.Printf("[DEBUG] %s/USD rates fetched: %d points\n", currency, len(currUSD))
+
+	usdSGDMap := make(map[string]float64)
+	for _, r := range usdSGD {
+		usdSGDMap[r.Date.Format("2006-01-02")] = r.Rate
+	}
+	fmt.Printf("[DEBUG] USD/SGD map sample: %v\n", usdSGDMap)
+
+	rates := make([]HistoricalRate, 0, len(currUSD))
+	for _, r := range currUSD {
+		dateKey := r.Date.Format("2006-01-02")
+		usdSgdRate, ok := usdSGDMap[dateKey]
+		if !ok || usdSgdRate == 0 || r.Rate == 0 {
+			continue
+		}
+		currUsdRate := r.Rate
+		if currUsdRate > 1 {
+			currUsdRate = 1 / currUsdRate
+		}
+		sgdCurr := usdSgdRate * currUsdRate
+		currSgd := 1 / sgdCurr
+		fmt.Printf("[DEBUG] %s: USD/SGD=%f, %s/USD raw=%f, %s/USD=%f, %s/SGD=%f\n", dateKey, usdSgdRate, currency, r.Rate, currency, currUsdRate, currency, currSgd)
+		rates = append(rates, HistoricalRate{
+			Date: r.Date,
+			Rate: currSgd,
 		})
 	}
 

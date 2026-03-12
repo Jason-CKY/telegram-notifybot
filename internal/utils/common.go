@@ -25,19 +25,11 @@ Available Commands:
 
 Supported Currencies:
 USD, EUR, GBP, JPY, MYR, HKD, AUD, KRW, TWD, VND, IDR, THB, CNY, INR, PHP
-
-Note: /fx_chart not available for TWD, VND (no free historical data)
 `
 
 const DEFAULT_TIMEZONE = "Asia/Singapore"
 
 var SupportedCurrencies = []string{"USD", "EUR", "GBP", "JPY", "MYR", "HKD", "AUD", "KRW", "TWD", "VND", "IDR", "THB", "CNY", "INR", "PHP"}
-
-var CurrenciesWithoutHistorical = map[string]bool{"TWD": true, "VND": true}
-
-func IsHistoricalSupported(currency string) bool {
-	return !CurrenciesWithoutHistorical[currency]
-}
 
 func IsCurrencySupported(currency string) bool {
 	upperCurrency := strings.ToUpper(currency)

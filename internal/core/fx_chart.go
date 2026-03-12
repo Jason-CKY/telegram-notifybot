@@ -18,9 +18,9 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, 
 
 	for i, r := range rates {
 		if inverse {
-			values[i] = r.Rate
-		} else {
 			values[i] = 1.0 / r.Rate
+		} else {
+			values[i] = r.Rate
 		}
 		dates[i] = r.Date.Format("Jan 06")
 	}
@@ -43,9 +43,9 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, 
 	minWithPadding := minVal - padding
 	maxWithPadding := maxVal + padding
 
-	title := fmt.Sprintf("SGD/%s Exchange Rate History", currency)
+	title := fmt.Sprintf("%s/SGD Exchange Rate History", currency)
 	if inverse {
-		title = fmt.Sprintf("%s/SGD Exchange Rate History (Inverse)", currency)
+		title = fmt.Sprintf("SGD/%s Exchange Rate History (Inverse)", currency)
 	}
 
 	chartOption := charts.ChartOption{
