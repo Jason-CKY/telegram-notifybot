@@ -18,9 +18,9 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, 
 
 	for i, r := range rates {
 		if inverse {
-			values[i] = r.Rate
-		} else {
 			values[i] = 1.0 / r.Rate
+		} else {
+			values[i] = r.Rate
 		}
 		dates[i] = r.Date.Format("Jan 06")
 	}
@@ -43,9 +43,9 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, 
 	minWithPadding := minVal - padding
 	maxWithPadding := maxVal + padding
 
-	title := fmt.Sprintf("SGD/%s Exchange Rate History", currency)
+	title := fmt.Sprintf("%s/SGD Exchange Rate History", currency)
 	if inverse {
-		title = fmt.Sprintf("%s/SGD Exchange Rate History (Inverse)", currency)
+		title = fmt.Sprintf("SGD/%s Exchange Rate History (Inverse)", currency)
 	}
 
 	chartOption := charts.ChartOption{
@@ -95,11 +95,11 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, 
 	return &buf, nil
 }
 
-func FormatCurrentRateMessage(currency string, rate float64, response *schemas.FrankfurterLatestResponse) string {
+func FormatCurrentRateMessage(currency string, rate float64, response *schemas.ExchangeRateResponse) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("💱 %s/SGD Exchange Rate\n\n", currency))
-	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n", 1/rate, currency))
-	sb.WriteString(fmt.Sprintf("1 %s → %.4f SGD\n\n", currency, rate))
+	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n", rate, currency))
+	sb.WriteString(fmt.Sprintf("1 %s → %.4f SGD\n\n", currency, 1/rate))
 
 	if response != nil {
 		sb.WriteString(fmt.Sprintf("Data as of: %s\n", response.Date))

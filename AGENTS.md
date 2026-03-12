@@ -4,7 +4,7 @@ This document provides guidelines for agentic coding agents working in this repo
 
 ## Project Overview
 
-This is a Go Telegram bot for currency exchange rate notifications. It fetches exchange rate data from the MAS API, stores user settings in Directus, and sends notifications via Telegram.
+This is a Go Telegram bot for currency exchange rate notifications. It fetches exchange rate data from the Yahoo Finance API, stores user settings in Directus, and sends notifications via Telegram.
 
 **Tech Stack:** Go 1.24, Telegram Bot API, Directus (headless CMS), PostgreSQL, Docker
 
@@ -404,6 +404,7 @@ func (cs *CurrencySubscription) UnmarshalJSON(data []byte) error {
 - Threshold notifications are one-time (auto-remove after triggered)
 - Interval notifications persist until manually removed
 - FX scheduler runs every hour
-- Frankfurter API provides daily exchange rates (replaced MAS API)
+- Yahoo Finance API provides daily exchange rates (replaced MAS API, Frankfurter, ExchangeRate-API)
+- VND and PHP require USD as intermediary for conversion (no direct SGD pairs available in Yahoo Finance)
 - JPY, KRW are quoted per 100 units; code handles division automatically
 - **Always update HELP_MESSAGE in `internal/utils/common.go` and test files when changing command behavior or adding new commands**

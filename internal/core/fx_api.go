@@ -4,7 +4,7 @@ import (
 	"github.com/Jason-CKY/telegram-notifybot/internal/schemas"
 )
 
-func GetCurrentRate(currency string) (float64, *schemas.FrankfurterLatestResponse, error) {
+func GetCurrentRate(currency string) (float64, *schemas.ExchangeRateResponse, error) {
 	return schemas.FetchLatestExchangeRate(currency)
 }
 

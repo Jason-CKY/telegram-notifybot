@@ -56,7 +56,7 @@ func TestGenerateExchangeRateChart_YAxisScaling(t *testing.T) {
 }
 
 func TestFormatCurrentRateMessage(t *testing.T) {
-	response := &schemas.FrankfurterLatestResponse{
+	response := &schemas.ExchangeRateResponse{
 		Amount: 1.0,
 		Base:   "SGD",
 		Date:   "2026-02-20",
