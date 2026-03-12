@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sort"
 	"time"
@@ -98,7 +99,7 @@ func fetchLatestFromYahoo(currency string) (float64, *FrankfurterLatestResponse,
 	result := response.Chart.Result[0]
 	rate := result.Meta.RegularMarketPrice
 
-	fmt.Printf("[DEBUG] /fx rate for %s: %f SGD/%s\n", currency, rate, currency)
+	slog.Debug("fx rate fetched", "currency", currency, "rate", rate)
 
 	if rate == 0 {
 		return 0, nil, fmt.Errorf("rate not available for currency: %s", currency)
@@ -214,19 +215,19 @@ func fetchHistoricalWithUSDIntermediary(currency string, days int) ([]Historical
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch USD/SGD rates: %w", err)
 	}
-	fmt.Printf("[DEBUG] USD/SGD rates fetched: %d points\n", len(usdSGD))
+	slog.Debug("USD/SGD rates fetched", "points", len(usdSGD))
 
 	currUSD, err := fetchHistoricalFromYahooWithPair(currency, "USD", days)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch %s/USD rates: %w", currency, err)
 	}
-	fmt.Printf("[DEBUG] %s/USD rates fetched: %d points\n", currency, len(currUSD))
+	slog.Debug("currency/USD rates fetched", "currency", currency, "points", len(currUSD))
 
 	usdSGDMap := make(map[string]float64)
 	for _, r := range usdSGD {
 		usdSGDMap[r.Date.Format("2006-01-02")] = r.Rate
 	}
-	fmt.Printf("[DEBUG] USD/SGD map sample: %v\n", usdSGDMap)
+	slog.Debug("USD/SGD map sample", "sample", usdSGDMap)
 
 	rates := make([]HistoricalRate, 0, len(currUSD))
 	for _, r := range currUSD {
@@ -241,7 +242,7 @@ func fetchHistoricalWithUSDIntermediary(currency string, days int) ([]Historical
 		}
 		sgdCurr := usdSgdRate * currUsdRate
 		currSgd := 1 / sgdCurr
-		fmt.Printf("[DEBUG] %s: USD/SGD=%f, %s/USD raw=%f, %s/USD=%f, %s/SGD=%f\n", dateKey, usdSgdRate, currency, r.Rate, currency, currUsdRate, currency, currSgd)
+		slog.Debug("calculated rate", "date", dateKey, "usd_sgd", usdSgdRate, "currency_raw", currency, "usd_raw", r.Rate, "currency_usd", currency, "currency_usd_value", currUsdRate, "currency_sgd", currency, "sgd_value", currSgd)
 		rates = append(rates, HistoricalRate{
 			Date: r.Date,
 			Rate: currSgd,
