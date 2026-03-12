@@ -95,7 +95,7 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, 
 	return &buf, nil
 }
 
-func FormatCurrentRateMessage(currency string, rate float64, response *schemas.FrankfurterLatestResponse) string {
+func FormatCurrentRateMessage(currency string, rate float64, response *schemas.ExchangeRateResponse) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("💱 %s/SGD Exchange Rate\n\n", currency))
 	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n", 1/rate, currency))

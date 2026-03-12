@@ -645,8 +645,8 @@ func TestIntegration_VNDConversion(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rates, 2)
 
-	assert.InDelta(t, 1.30/25000.0, rates[0].Rate, 0.001, "SGD/VND should be USD/SGD divided by VND/USD")
-	assert.InDelta(t, 1.35/26000.0, rates[1].Rate, 0.001)
+	assert.InDelta(t, 25000.0/1.30, rates[0].Rate, 0.001, "SGD/VND should be VND/USD divided by USD/SGD")
+	assert.InDelta(t, 26000.0/1.35, rates[1].Rate, 0.001)
 
 	chartBuf, err := GenerateExchangeRateChart(rates, "VND", false)
 	require.NoError(t, err)

@@ -55,18 +55,18 @@ type HistoricalRate struct {
 	Rate float64
 }
 
-type FrankfurterLatestResponse struct {
+type ExchangeRateResponse struct {
 	Amount float64            `json:"amount"`
 	Base   string             `json:"base"`
 	Date   string             `json:"date"`
 	Rates  map[string]float64 `json:"rates"`
 }
 
-func FetchLatestExchangeRate(currency string) (float64, *FrankfurterLatestResponse, error) {
+func FetchLatestExchangeRate(currency string) (float64, *ExchangeRateResponse, error) {
 	return fetchLatestFromYahoo(currency)
 }
 
-func fetchLatestFromYahoo(currency string) (float64, *FrankfurterLatestResponse, error) {
+func fetchLatestFromYahoo(currency string) (float64, *ExchangeRateResponse, error) {
 	endpoint := fmt.Sprintf("%s/SGD%s=X", yahooFinanceURL, currency)
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
@@ -105,14 +105,14 @@ func fetchLatestFromYahoo(currency string) (float64, *FrankfurterLatestResponse,
 		return 0, nil, fmt.Errorf("rate not available for currency: %s", currency)
 	}
 
-	frankfurterResp := &FrankfurterLatestResponse{
+	exchangeResp := &ExchangeRateResponse{
 		Amount: 1.0,
 		Base:   "SGD",
 		Date:   time.Now().Format("2006-01-02"),
 		Rates:  map[string]float64{currency: rate},
 	}
 
-	return rate, frankfurterResp, nil
+	return rate, exchangeResp, nil
 }
 
 func FetchHistoricalExchangeRates(currency string, days int) ([]HistoricalRate, error) {

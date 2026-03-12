@@ -75,7 +75,7 @@ func TestFetchLatestExchangeRate_APIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "status 500")
 }
 
-func fetchLatestFromURL(baseURL, currency string) (float64, *FrankfurterLatestResponse, error) {
+func fetchLatestFromURL(baseURL, currency string) (float64, *ExchangeRateResponse, error) {
 	endpoint := fmt.Sprintf("%s/SGD%s=X", baseURL, currency)
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
@@ -112,14 +112,14 @@ func fetchLatestFromURL(baseURL, currency string) (float64, *FrankfurterLatestRe
 		return 0, nil, fmt.Errorf("rate not available for currency: %s", currency)
 	}
 
-	frankfurterResp := &FrankfurterLatestResponse{
+	exchangeResp := &ExchangeRateResponse{
 		Amount: 1.0,
 		Base:   "SGD",
 		Date:   time.Now().Format("2006-01-02"),
 		Rates:  map[string]float64{currency: rate},
 	}
 
-	return rate, frankfurterResp, nil
+	return rate, exchangeResp, nil
 }
 
 func TestFetchHistoricalExchangeRates_Success(t *testing.T) {
