@@ -405,5 +405,6 @@ func (cs *CurrencySubscription) UnmarshalJSON(data []byte) error {
 - Interval notifications persist until manually removed
 - FX scheduler runs every hour
 - Yahoo Finance API provides daily exchange rates (replaced MAS API, Frankfurter, ExchangeRate-API)
+- VND and PHP require USD as intermediary for conversion (no direct SGD pairs available in Yahoo Finance)
 - JPY, KRW are quoted per 100 units; code handles division automatically
 - **Always update HELP_MESSAGE in `internal/utils/common.go` and test files when changing command behavior or adding new commands**

@@ -98,8 +98,8 @@ func GenerateExchangeRateChart(rates []schemas.HistoricalRate, currency string, 
 func FormatCurrentRateMessage(currency string, rate float64, response *schemas.ExchangeRateResponse) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("💱 %s/SGD Exchange Rate\n\n", currency))
-	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n", 1/rate, currency))
-	sb.WriteString(fmt.Sprintf("1 %s → %.4f SGD\n\n", currency, rate))
+	sb.WriteString(fmt.Sprintf("1 SGD → %.4f %s\n", rate, currency))
+	sb.WriteString(fmt.Sprintf("1 %s → %.4f SGD\n\n", currency, 1/rate))
 
 	if response != nil {
 		sb.WriteString(fmt.Sprintf("Data as of: %s\n", response.Date))

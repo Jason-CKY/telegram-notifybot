@@ -516,7 +516,7 @@ func TestIntegration_FetchWithUSDIntermediary(t *testing.T) {
 		path := r.URL.Path
 
 		var response interface{}
-		if strings.Contains(path, "PHPUSD=X") {
+		if strings.Contains(path, "USDPHP=X") {
 			response = schemas.YahooChartResponse{
 				Chart: struct {
 					Result []*schemas.YahooChartResult `json:"result"`
@@ -589,7 +589,7 @@ func TestIntegration_VNDConversion(t *testing.T) {
 		path := r.URL.Path
 
 		var response interface{}
-		if strings.Contains(path, "VNDUSD") {
+		if strings.Contains(path, "USDVND=X") {
 			response = schemas.YahooChartResponse{
 				Chart: struct {
 					Result []*schemas.YahooChartResult `json:"result"`

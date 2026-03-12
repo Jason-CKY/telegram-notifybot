@@ -1,3 +1,15 @@
+// Package schemas provides exchange rate fetching via Yahoo Finance API.
+//
+// Yahoo Finance API Notes:
+//   - Uses pairs like SGDUSD=X for SGD/USD exchange rate
+//   - Most currencies have direct SGD pairs (e.g., SGDEUR=X, SGDJPY=X)
+//   - Some currencies (VND, PHP) don't have direct SGD pairs and require USD intermediary:
+//     SGD -> USD -> Currency conversion using both USD/SGD and Currency/USD rates
+//
+// Exchange Rate Calculation:
+//   - For direct pairs: Rate = Yahoo returns SGD per unit of foreign currency
+//   - For USD intermediary (VND, PHP):
+//     SGD/XXX = (USD/SGD) / (USD/XXX) = USD_SGD_rate / XXX_USD_rate
 package schemas
 
 import (
@@ -63,11 +75,20 @@ type ExchangeRateResponse struct {
 }
 
 func FetchLatestExchangeRate(currency string) (float64, *ExchangeRateResponse, error) {
+	// VND and PHP don't have direct SGD pairs in Yahoo Finance
+	// Use USD as intermediary: SGD -> USD -> VND/PHP
+	if currency == "VND" || currency == "PHP" {
+		return fetchLatestWithUSDIntermediary(currency)
+	}
 	return fetchLatestFromYahoo(currency)
 }
 
 func fetchLatestFromYahoo(currency string) (float64, *ExchangeRateResponse, error) {
-	endpoint := fmt.Sprintf("%s/SGD%s=X", yahooFinanceURL, currency)
+	return fetchLatestFromYahooWithPair("SGD", currency)
+}
+
+func fetchLatestFromYahooWithPair(base, quote string) (float64, *ExchangeRateResponse, error) {
+	endpoint := fmt.Sprintf("%s/%s%s=X", yahooFinanceURL, base, quote)
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -93,17 +114,50 @@ func fetchLatestFromYahoo(currency string) (float64, *ExchangeRateResponse, erro
 	}
 
 	if len(response.Chart.Result) == 0 {
-		return 0, nil, fmt.Errorf("no data available for currency: %s", currency)
+		return 0, nil, fmt.Errorf("no data available for pair: %s/%s", base, quote)
 	}
 
 	result := response.Chart.Result[0]
 	rate := result.Meta.RegularMarketPrice
 
-	slog.Debug("fx rate fetched", "currency", currency, "rate", rate)
+	slog.Debug("fx rate fetched", "pair", fmt.Sprintf("%s/%s", base, quote), "rate", rate)
 
 	if rate == 0 {
-		return 0, nil, fmt.Errorf("rate not available for currency: %s", currency)
+		return 0, nil, fmt.Errorf("rate not available for pair: %s/%s", base, quote)
 	}
+
+	exchangeResp := &ExchangeRateResponse{
+		Amount: 1.0,
+		Base:   base,
+		Date:   time.Now().Format("2006-01-02"),
+		Rates:  map[string]float64{quote: rate},
+	}
+
+	return rate, exchangeResp, nil
+}
+
+func fetchLatestWithUSDIntermediary(currency string) (float64, *ExchangeRateResponse, error) {
+	// Fetch USD/SGD rate (how many SGD per 1 USD)
+	usdSGD, _, err := fetchLatestFromYahooWithPair("USD", "SGD")
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to fetch USD/SGD rate: %w", err)
+	}
+
+	// Fetch USD/currency rate (how many currency per 1 USD)
+	// Yahoo ticker format: USD{currency}=X (e.g., USDVND=X, USDPHP=X)
+	// This returns how many VND/PHP you get per 1 USD
+	usdCurrency, _, err := fetchLatestFromYahooWithPair("USD", currency)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to fetch USD/%s rate: %w", currency, err)
+	}
+
+	// Convert: SGD -> USD -> Currency
+	// 1 SGD = (1/usdSGD) USD
+	// 1 USD = usdCurrency Currency
+	// Therefore: 1 SGD = (1/usdSGD) * usdCurrency = usdCurrency / usdSGD
+	rate := usdCurrency / usdSGD
+
+	slog.Debug("fx rate via USD intermediary", "currency", currency, "usd_sgd", usdSGD, "usd_currency", usdCurrency, "result", rate)
 
 	exchangeResp := &ExchangeRateResponse{
 		Amount: 1.0,
@@ -123,6 +177,12 @@ func FetchHistoricalExchangeRates(currency string, days int) ([]HistoricalRate, 
 		days = 3650
 	}
 
+	// VND and PHP require USD as intermediary because:
+	// 1. Yahoo Finance doesn't provide direct SGD/VND or SGD/PHP pairs
+	// 2. We fetch USD/SGD and currency/USD separately, then compute: SGD -> USD -> VND/PHP
+	// 3. Formula: SGD/VND = (USD/VND) / (USD/SGD) = (1/USD/VND rate) / USD/SGD rate
+	//    Alternatively: SGD/VND = 1 / (USD/SGD * VND/USD) where VND/USD = 1/(USD/VND)
+	//    Simplified: SGD/VND = USD_SGD_rate / VND_USD_rate
 	if currency == "VND" || currency == "PHP" {
 		return fetchHistoricalWithUSDIntermediary(currency, days)
 	}
@@ -217,11 +277,13 @@ func fetchHistoricalWithUSDIntermediary(currency string, days int) ([]Historical
 	}
 	slog.Debug("USD/SGD rates fetched", "points", len(usdSGD))
 
-	currUSD, err := fetchHistoricalFromYahooWithPair(currency, "USD", days)
+	// Use USD{currency}=X format (e.g., USDVND=X, USDPHP=X)
+	// This returns how many currency units per 1 USD
+	usdCurrency, err := fetchHistoricalFromYahooWithPair("USD", currency, days)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s/USD rates: %w", currency, err)
+		return nil, fmt.Errorf("failed to fetch USD/%s rates: %w", currency, err)
 	}
-	slog.Debug("currency/USD rates fetched", "currency", currency, "points", len(currUSD))
+	slog.Debug("USD/currency rates fetched", "currency", currency, "points", len(usdCurrency))
 
 	usdSGDMap := make(map[string]float64)
 	for _, r := range usdSGD {
@@ -229,20 +291,18 @@ func fetchHistoricalWithUSDIntermediary(currency string, days int) ([]Historical
 	}
 	slog.Debug("USD/SGD map sample", "sample", usdSGDMap)
 
-	rates := make([]HistoricalRate, 0, len(currUSD))
-	for _, r := range currUSD {
+	rates := make([]HistoricalRate, 0, len(usdCurrency))
+	for _, r := range usdCurrency {
 		dateKey := r.Date.Format("2006-01-02")
 		usdSgdRate, ok := usdSGDMap[dateKey]
 		if !ok || usdSgdRate == 0 || r.Rate == 0 {
 			continue
 		}
-		currUsdRate := r.Rate
-		if currUsdRate > 1 {
-			currUsdRate = 1 / currUsdRate
-		}
-		sgdCurr := usdSgdRate * currUsdRate
-		currSgd := 1 / sgdCurr
-		slog.Debug("calculated rate", "date", dateKey, "usd_sgd", usdSgdRate, "currency_raw", currency, "usd_raw", r.Rate, "currency_usd", currency, "currency_usd_value", currUsdRate, "currency_sgd", currency, "sgd_value", currSgd)
+		// usdSgdRate = SGD per 1 USD
+		// r.Rate = currency per 1 USD (e.g., 25000 VND per USD)
+		// To get currency per SGD: currency/SGD = (currency/USD) / (SGD/USD)
+		currSgd := r.Rate / usdSgdRate
+		slog.Debug("calculated rate", "date", dateKey, "usd_sgd", usdSgdRate, "currency_usd", r.Rate, "result", currSgd)
 		rates = append(rates, HistoricalRate{
 			Date: r.Date,
 			Rate: currSgd,
